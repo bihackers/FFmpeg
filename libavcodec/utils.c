@@ -2633,7 +2633,9 @@ int avcodec_decode_subtitle2(AVCodecContext *avctx, AVSubtitle *sub,
                 && *got_sub_ptr && sub->num_rects) {
                 const AVRational tb = avctx->pkt_timebase.num ? avctx->pkt_timebase
                                                               : avctx->time_base;
-                ret = convert_sub_to_old_ass_form(sub, avpkt, tb);
+                int err = convert_sub_to_old_ass_form(sub, avpkt, tb);
+                if (err < 0)
+                    ret = err;
             }
 #endif
 
@@ -2784,11 +2786,17 @@ int attribute_align_arg avcodec_send_packet(AVCodecContext *avctx, const AVPacke
 
     if (avctx->codec->send_packet) {
         if (avpkt) {
-            ret = apply_param_change(avctx, (AVPacket *)avpkt);
-            if (ret < 0)
-                return ret;
+            AVPacket tmp = *avpkt;
+            int did_split = av_packet_split_side_data(&tmp);
+            ret = apply_param_change(avctx, &tmp);
+            if (ret >= 0)
+                ret = avctx->codec->send_packet(avctx, &tmp);
+            if (did_split)
+                av_packet_free_side_data(&tmp);
+            return ret;
+        } else {
+            return avctx->codec->send_packet(avctx, NULL);
         }
-        return avctx->codec->send_packet(avctx, avpkt);
     }
 
     // Emulation via old API. Assume avpkt is likely not refcounted, while
