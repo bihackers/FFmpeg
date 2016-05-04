@@ -13,10 +13,10 @@ ADDI_CFLAGS="-O3 -Wall -mthumb -pipe -fpic -fasm \
   -D__ARM_ARCH_5__ -D__ARM_ARCH_5E__ -D__ARM_ARCH_5T__ -D__ARM_ARCH_5TE__ \
   -DANDROID -DNDEBUG"
 ADDI_LDFLAGS=
-ADDITIONAL_CONFIGURE_FLAG="--disable-everything --enable-cross-compile --enable-debug --disable-programs \
-                 --enable-asm --enable-neon --enable-doc --enable-pic --enable-memalign-hack --enable-small \
-                 --enable-decoder=h264  --enable-encoder=aac --enable-decoder=pcm_mulaw  --disable-demuxers --disable-parsers --disable-protocols  \
-                 "
+#ADDITIONAL_CONFIGURE_FLAG="--disable-everything --enable-cross-compile --enable-debug --disable-programs \
+#                 --enable-asm --enable-neon --enable-doc --enable-pic --enable-memalign-hack --enable-small \
+#                 --enable-decoder=h264  --enable-encoder=aac --enable-decoder=pcm_mulaw  --disable-demuxers --disable-parsers --disable-protocols  \
+#                 "
 export CC="$TOOLCHAIN/bin/arm-linux-androideabi-gcc"
 export LD=$TOOLCHAIN/bin/arm-linux-androideabi-ld
 export AR=$TOOLCHAIN/bin/arm-linux-androideabi-ar
@@ -67,10 +67,10 @@ function build_one
 --enable-demuxer=hls \
 --enable-demuxer=hevc \
 --enable-parser=h264 \
---enable-network \
---enable-mediacodec \
---enable-jni \
---enable-decoder=h264_mediacodec
+--enable-network 
+#--enable-mediacodec \
+#--enable-jni \
+#--enable-decoder=h264_mediacodec
 }
 CPU=arm
 ADDI_LDFLAGS="-Wl,--fix-cortex-a8"

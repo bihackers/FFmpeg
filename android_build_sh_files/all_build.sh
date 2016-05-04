@@ -18,6 +18,8 @@ rm ../ffmpeg_x86_64.sh
 cp ffmpeg_x86_64.sh ../ffmpeg_x86_64.sh
 
 cd ..
+rm -rf android_ffmpeg_build
+
 find . -name "*.o"  | xargs rm -f
 ./ffmpeg_arm64.sh
 find . -name "*.o"  | xargs rm -f

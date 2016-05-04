@@ -7,10 +7,10 @@ export TMPDIR=./tmp
 OLD=""
 ADDI_CFLAGS=
 ADDI_LDFLAGS=
-ADDITIONAL_CONFIGURE_FLAG="--disable-everything --enable-cross-compile --enable-debug --disable-programs \
-                 --enable-asm --enable-neon --enable-doc --enable-pic --enable-memalign-hack --enable-small \
-                 --enable-decoder=h264  --enable-encoder=aac --enable-decoder=pcm_mulaw  --disable-demuxers --disable-parsers --disable-protocols  \
-                 "
+#ADDITIONAL_CONFIGURE_FLAG="--disable-everything --enable-cross-compile --enable-debug --disable-programs \
+#                 --enable-asm --enable-neon --enable-doc --enable-pic --enable-memalign-hack --enable-small \
+#                 --enable-decoder=h264  --enable-encoder=aac --enable-decoder=pcm_mulaw  --disable-demuxers --disable-parsers --disable-protocols  \
+#                 "
 export CC="$TOOLCHAIN/bin/aarch64-linux-android-gcc"
 export LD=$TOOLCHAIN/bin/aarch64-linux-android-ld
 export AR=$TOOLCHAIN/bin/aarch64-linux-android-ar
@@ -62,10 +62,7 @@ function build_one
 --enable-demuxer=hevc \
 --enable-parser=h264 \
 --enable-yasm \
---enable-network \
---enable-mediacodec \
---enable-jni \
---enable-decoder=h264_mediacodec
+--enable-network
 }
 ADDI_LDFLAGS=
 PREFIX=android_ffmpeg_build/arm64

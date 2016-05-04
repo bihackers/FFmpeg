@@ -17,6 +17,8 @@ cp ffmpeg_x86_64_ios.sh ../ffmpeg_x86_64_ios.sh
 
 cd ..
 
+rm -rf ios_ffmpeg_build
+
 find . -name "*.o"  | xargs rm -f
 ./ffmpeg_arm64_ios.sh
 
