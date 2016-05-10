@@ -41,3 +41,9 @@ rm ffmpeg_armv7.sh
 rm ffmpeg_armv7s.sh
 rm ffmpeg_i386.sh
 rm ffmpeg_x86_64_ios.sh
+
+cd ios_build_sh_files
+cp lipo.sh ../ios_ffmpeg_build
+cd ../ios_ffmpeg_build
+chmod u+x lipo.sh
+./lipo.sh
