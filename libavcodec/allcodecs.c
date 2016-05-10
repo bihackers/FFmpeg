@@ -196,9 +196,11 @@ void avcodec_register_all(void)
 #if FF_API_VDPAU
     REGISTER_DECODER(H264_VDPAU,        h264_vdpau);
 #endif
+    REGISTER_ENCODER(H264_VAAPI,        h264_vaapi);
     REGISTER_ENCDEC (HAP,               hap);
     REGISTER_DECODER(HEVC,              hevc);
     REGISTER_DECODER(HEVC_QSV,          hevc_qsv);
+    REGISTER_ENCODER(HEVC_VAAPI,        hevc_vaapi);
     REGISTER_DECODER(HNM4_VIDEO,        hnm4_video);
     REGISTER_DECODER(HQ_HQA,            hq_hqa);
     REGISTER_DECODER(HQX,               hqx);
@@ -218,10 +220,12 @@ void avcodec_register_all(void)
     REGISTER_DECODER(LAGARITH,          lagarith);
     REGISTER_ENCODER(LJPEG,             ljpeg);
     REGISTER_DECODER(LOCO,              loco);
+    REGISTER_DECODER(M101,              m101);
     REGISTER_DECODER(MDEC,              mdec);
     REGISTER_DECODER(MIMIC,             mimic);
     REGISTER_ENCDEC (MJPEG,             mjpeg);
     REGISTER_DECODER(MJPEGB,            mjpegb);
+    REGISTER_ENCODER(MJPEG_VAAPI,       mjpeg_vaapi);
     REGISTER_DECODER(MMVIDEO,           mmvideo);
     REGISTER_DECODER(MOTIONPIXELS,      motionpixels);
 #if FF_API_XVMC
