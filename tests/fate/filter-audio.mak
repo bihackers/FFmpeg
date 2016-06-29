@@ -20,6 +20,70 @@ fate-filter-aemphasis-75kf: CMD = framecrc -i $(SRC) -af aemphasis=2:8:reproduct
 
 FATE_AFILTER-$(call FILTERDEMDECENCMUX, AEMPHASIS, WAV, PCM_S16LE, PCM_S16LE, WAV) += $(FATE_FILTER_AEMPHASIS)
 
+FATE_FILTER_AFADE += fate-filter-afade-qsin
+fate-filter-afade-qsin: tests/data/asynth-44100-2.wav
+fate-filter-afade-qsin: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-afade-qsin: CMD = framecrc -i $(SRC) -af afade=t=in:ss=0:d=2:curve=qsin
+
+FATE_FILTER_AFADE += fate-filter-afade-iqsin
+fate-filter-afade-iqsin: tests/data/asynth-44100-2.wav
+fate-filter-afade-iqsin: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-afade-iqsin: CMD = framecrc -i $(SRC) -af afade=t=in:ss=0:d=2:curve=iqsin
+
+FATE_FILTER_AFADE += fate-filter-afade-esin
+fate-filter-afade-esin: tests/data/asynth-44100-2.wav
+fate-filter-afade-esin: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-afade-esin: CMD = framecrc -i $(SRC) -af afade=t=in:ss=0:d=2:curve=esin
+
+FATE_FILTER_AFADE += fate-filter-afade-hsin
+fate-filter-afade-hsin: tests/data/asynth-44100-2.wav
+fate-filter-afade-hsin: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-afade-hsin: CMD = framecrc -i $(SRC) -af afade=t=in:ss=0:d=2:curve=hsin
+
+FATE_FILTER_AFADE += fate-filter-afade-exp
+fate-filter-afade-exp: tests/data/asynth-44100-2.wav
+fate-filter-afade-exp: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-afade-exp: CMD = framecrc -i $(SRC) -af afade=t=in:ss=0:d=2:curve=exp
+
+FATE_FILTER_AFADE += fate-filter-afade-log
+fate-filter-afade-log: tests/data/asynth-44100-2.wav
+fate-filter-afade-log: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-afade-log: CMD = framecrc -i $(SRC) -af afade=t=in:ss=1:d=2.5:curve=log
+
+FATE_AFILTER-$(call FILTERDEMDECENCMUX, AFADE, WAV, PCM_S16LE, PCM_S16LE, WAV) += $(FATE_FILTER_AFADE)
+
+FATE_AFILTER_SAMPLES-$(call FILTERDEMDECENCMUX, ACROSSFADE, WAV, PCM_S16LE, PCM_S16LE, WAV) += fate-filter-acrossfade
+fate-filter-acrossfade: tests/data/asynth-44100-2.wav
+fate-filter-acrossfade: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-acrossfade: SRC2 = $(TARGET_SAMPLES)/audio-reference/luckynight_2ch_44kHz_s16.wav
+fate-filter-acrossfade: CMD = framecrc -i $(SRC) -i $(SRC2) -filter_complex acrossfade=d=2:c1=log:c2=exp
+
+FATE_AFILTER-$(call FILTERDEMDECENCMUX, AFADE, WAV, PCM_S16LE, PCM_S16LE, WAV) += fate-filter-agate
+fate-filter-agate: tests/data/asynth-44100-2.wav
+fate-filter-agate: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-agate: CMD = framecrc -i $(SRC) -af agate=level_in=10:range=0:threshold=1:ratio=1:attack=1:knee=1:makeup=4
+
+FATE_AFILTER-$(call FILTERDEMDECENCMUX, AFADE, WAV, PCM_S16LE, PCM_S16LE, WAV) += fate-filter-alimiter
+fate-filter-alimiter: tests/data/asynth-44100-2.wav
+fate-filter-alimiter: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-alimiter: CMD = framecrc -i $(SRC) -af alimiter=level_in=1:level_out=2:limit=0.2
+
+FATE_AFILTER-$(call FILTERDEMDECENCMUX, AMERGE, WAV, PCM_S16LE, PCM_S16LE, WAV) += fate-filter-amerge
+fate-filter-amerge: tests/data/asynth-44100-1.wav
+fate-filter-amerge: SRC = $(TARGET_PATH)/tests/data/asynth-44100-1.wav
+fate-filter-amerge: CMD = framecrc -i $(SRC) -i $(SRC) -filter_complex "[0:a][1:a]amerge=inputs=2[aout]" -map "[aout]"
+
+FATE_AFILTER-$(call FILTERDEMDECENCMUX, APAD, WAV, PCM_S16LE, PCM_S16LE, WAV) += fate-filter-apad
+fate-filter-apad: tests/data/asynth-44100-2.wav
+fate-filter-apad: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-apad: CMD = framecrc -i $(SRC) -af apad=pad_len=10
+
+FATE_AFILTER-$(call FILTERDEMDECENCMUX, ANEQUALIZER, WAV, PCM_S16LE, PCM_S16LE, WAV) += fate-filter-anequalizer
+fate-filter-anequalizer: tests/data/asynth-44100-2.wav
+fate-filter-anequalizer: tests/data/filtergraphs/anequalizer
+fate-filter-anequalizer: SRC = $(TARGET_PATH)/tests/data/asynth-44100-2.wav
+fate-filter-anequalizer: CMD = framecrc -i $(SRC) -filter_complex_script $(TARGET_PATH)/tests/data/filtergraphs/anequalizer
+
 tests/data/hls-list.m3u8: TAG = GEN
 tests/data/hls-list.m3u8: ffmpeg$(PROGSSUF)$(EXESUF) | tests/data
 	$(M)$(TARGET_EXEC) $(TARGET_PATH)/$< \
@@ -126,8 +190,8 @@ fate-filter-hdcd: CMP = oneline
 fate-filter-hdcd: REF = 5db465a58d2fd0d06ca944b883b33476
 
 FATE_AFILTER-yes += fate-filter-formats
-fate-filter-formats: libavfilter/formats-test$(EXESUF)
-fate-filter-formats: CMD = run libavfilter/formats-test
+fate-filter-formats: libavfilter/tests/formats$(EXESUF)
+fate-filter-formats: CMD = run libavfilter/tests/formats
 
 FATE_SAMPLES_AVCONV += $(FATE_AFILTER_SAMPLES-yes)
 FATE_FFMPEG += $(FATE_AFILTER-yes)

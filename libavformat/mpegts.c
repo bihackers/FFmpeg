@@ -1,5 +1,5 @@
 /*
- * MPEG2 transport stream (aka DVB) demuxer
+ * MPEG-2 transport stream (aka DVB) demuxer
  * Copyright (c) 2002-2003 Fabrice Bellard
  *
  * This file is part of FFmpeg.
@@ -38,8 +38,8 @@
 #include "mpeg.h"
 #include "isom.h"
 
-/* maximum size in which we look for synchronisation if
- * synchronisation is lost */
+/* maximum size in which we look for synchronization if
+ * synchronization is lost */
 #define MAX_RESYNC_SIZE 65536
 
 #define MAX_PES_PAYLOAD 200 * 1024
@@ -446,7 +446,7 @@ static MpegTSFilter *mpegts_open_filter(MpegTSContext *ts, unsigned int pid,
 {
     MpegTSFilter *filter;
 
-    av_log(ts->stream, AV_LOG_TRACE, "Filter: pid=0x%x\n", pid);
+    av_log(ts->stream, AV_LOG_TRACE, "Filter: pid=0x%x type=%d\n", pid, type);
 
     if (pid >= NB_PID_MAX || ts->pids[pid])
         return NULL;
@@ -700,6 +700,7 @@ static const StreamType ISO_types[] = {
     { 0x11, AVMEDIA_TYPE_AUDIO, AV_CODEC_ID_AAC_LATM   }, /* LATM syntax */
 #endif
     { 0x1b, AVMEDIA_TYPE_VIDEO, AV_CODEC_ID_H264       },
+    { 0x1c, AVMEDIA_TYPE_AUDIO, AV_CODEC_ID_AAC        },
     { 0x20, AVMEDIA_TYPE_VIDEO, AV_CODEC_ID_H264       },
     { 0x21, AVMEDIA_TYPE_VIDEO, AV_CODEC_ID_JPEG2000   },
     { 0x24, AVMEDIA_TYPE_VIDEO, AV_CODEC_ID_HEVC       },
@@ -1030,7 +1031,7 @@ static int mpegts_push_data(MpegTSFilter *filter,
                  * decide */
                 if (pes->header[0] == 0x00 && pes->header[1] == 0x00 &&
                     pes->header[2] == 0x01) {
-                    /* it must be an mpeg2 PES stream */
+                    /* it must be an MPEG-2 PES stream */
                     code = pes->header[3] | 0x100;
                     av_log(pes->stream, AV_LOG_TRACE, "pid=%x pes_code=%#x\n", pes->pid,
                             code);
@@ -1406,6 +1407,14 @@ static int parse_MP4SLDescrTag(MP4DescrParseContext *d, int64_t off, int len)
     if (!descr)
         return AVERROR_INVALIDDATA;
 
+#define R8_CHECK_CLIP_MAX(dst, maxv) do {                       \
+    descr->sl.dst = avio_r8(&d->pb);                            \
+    if (descr->sl.dst > maxv) {                                 \
+        descr->sl.dst = maxv;                                   \
+        return AVERROR_INVALIDDATA;                             \
+    }                                                           \
+} while (0)
+
     predefined = avio_r8(&d->pb);
     if (!predefined) {
         int lengths;
@@ -1418,14 +1427,9 @@ static int parse_MP4SLDescrTag(MP4DescrParseContext *d, int64_t off, int len)
         descr->sl.use_idle        = !!(flags & 0x02);
         descr->sl.timestamp_res   = avio_rb32(&d->pb);
         avio_rb32(&d->pb);
-        descr->sl.timestamp_len      = avio_r8(&d->pb);
-        if (descr->sl.timestamp_len > 64) {
-            avpriv_request_sample(NULL, "timestamp_len > 64");
-            descr->sl.timestamp_len = 64;
-            return AVERROR_PATCHWELCOME;
-        }
-        descr->sl.ocr_len            = avio_r8(&d->pb);
-        descr->sl.au_len             = avio_r8(&d->pb);
+        R8_CHECK_CLIP_MAX(timestamp_len, 63);
+        R8_CHECK_CLIP_MAX(ocr_len,       63);
+        R8_CHECK_CLIP_MAX(au_len,        31);
         descr->sl.inst_bitrate_len   = avio_r8(&d->pb);
         lengths                      = avio_rb16(&d->pb);
         descr->sl.degr_prior_len     = lengths >> 12;
@@ -1890,8 +1894,8 @@ static void pmt_cb(MpegTSFilter *filter, const uint8_t *section, int section_len
     if (skip_identical(h, tssf))
         return;
 
-    av_log(ts->stream, AV_LOG_TRACE, "sid=0x%x sec_num=%d/%d version=%d\n",
-            h->id, h->sec_num, h->last_sec_num, h->version);
+    av_log(ts->stream, AV_LOG_TRACE, "sid=0x%x sec_num=%d/%d version=%d tid=%d\n",
+            h->id, h->sec_num, h->last_sec_num, h->version, h->tid);
 
     if (h->tid != PMT_TID)
         return;
@@ -2508,8 +2512,10 @@ static int mpegts_probe(AVProbeData *p)
 
     ff_dlog(0, "TS score: %d %d\n", sumscore, maxscore);
 
-    if        (check_count >= CHECK_COUNT && sumscore > 6) {
+    if        (check_count > CHECK_COUNT && sumscore > 6) {
         return AVPROBE_SCORE_MAX   + sumscore - CHECK_COUNT;
+    } else if (check_count >= CHECK_COUNT && sumscore > 6) {
+        return AVPROBE_SCORE_MAX/2 + sumscore - CHECK_COUNT;
     } else if (check_count >= CHECK_COUNT && maxscore > 6) {
         return AVPROBE_SCORE_MAX/2 + sumscore - CHECK_COUNT;
     } else if (sumscore > 6) {

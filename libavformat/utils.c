@@ -2565,11 +2565,13 @@ static void estimate_timings_from_bit_rate(AVFormatContext *ic)
 
     /* if bit_rate is already set, we believe it */
     if (ic->bit_rate <= 0) {
-        int bit_rate = 0;
+        int64_t bit_rate = 0;
         for (i = 0; i < ic->nb_streams; i++) {
             st = ic->streams[i];
+            if (st->codecpar->bit_rate <= 0 && st->internal->avctx->bit_rate > 0)
+                st->codecpar->bit_rate = st->internal->avctx->bit_rate;
             if (st->codecpar->bit_rate > 0) {
-                if (INT_MAX - st->codecpar->bit_rate < bit_rate) {
+                if (INT64_MAX - st->codecpar->bit_rate < bit_rate) {
                     bit_rate = 0;
                     break;
                 }
@@ -2773,12 +2775,12 @@ static void estimate_timings(AVFormatContext *ic, int64_t old_offset)
         AVStream av_unused *st;
         for (i = 0; i < ic->nb_streams; i++) {
             st = ic->streams[i];
-            av_log(ic, AV_LOG_TRACE, "%d: start_time: %0.3f duration: %0.3f\n", i,
-                    (double) st->start_time / AV_TIME_BASE,
-                    (double) st->duration   / AV_TIME_BASE);
+            av_log(ic, AV_LOG_TRACE, "stream %d: start_time: %0.3f duration: %0.3f\n", i,
+                   (double) st->start_time * av_q2d(st->time_base),
+                   (double) st->duration   * av_q2d(st->time_base));
         }
         av_log(ic, AV_LOG_TRACE,
-                "stream: start_time: %0.3f duration: %0.3f bitrate=%"PRId64" kb/s\n",
+                "format: start_time: %0.3f duration: %0.3f bitrate=%"PRId64" kb/s\n",
                 (double) ic->start_time / AV_TIME_BASE,
                 (double) ic->duration   / AV_TIME_BASE,
                 (int64_t)ic->bit_rate / 1000);
@@ -3297,8 +3299,8 @@ int avformat_find_stream_info(AVFormatContext *ic, AVDictionary **options)
     }
 
     if (ic->pb)
-        av_log(ic, AV_LOG_DEBUG, "Before avformat_find_stream_info() pos: %"PRId64" bytes read:%"PRId64" seeks:%d\n",
-               avio_tell(ic->pb), ic->pb->bytes_read, ic->pb->seek_count);
+        av_log(ic, AV_LOG_DEBUG, "Before avformat_find_stream_info() pos: %"PRId64" bytes read:%"PRId64" seeks:%d nb_streams:%d\n",
+               avio_tell(ic->pb), ic->pb->bytes_read, ic->pb->seek_count, ic->nb_streams);
 
     for (i = 0; i < ic->nb_streams; i++) {
         const AVCodec *codec;
@@ -3602,12 +3604,23 @@ FF_ENABLE_DEPRECATION_WARNINGS
         count++;
     }
 
-    if (eof_reached && ic->internal->packet_buffer) {
+    if (eof_reached) {
         int stream_index;
         for (stream_index = 0; stream_index < ic->nb_streams; stream_index++) {
+            st = ic->streams[stream_index];
+            avctx = st->internal->avctx;
+            if (!has_codec_parameters(st, NULL)) {
+                const AVCodec *codec = find_decoder(ic, st, st->codecpar->codec_id);
+                if (codec && !avctx->codec) {
+                    if (avcodec_open2(avctx, codec, (options && stream_index < orig_nb_streams) ? &options[stream_index] : NULL) < 0)
+                        av_log(ic, AV_LOG_WARNING,
+                            "Failed to open codec in av_find_stream_info\n");
+                }
+            }
+
             // EOF already reached while reading the stream above.
             // So continue with reoordering DTS with whatever delay we have.
-            if (!has_decode_delay_been_guessed(st)) {
+            if (ic->internal->packet_buffer && !has_decode_delay_been_guessed(st)) {
                 update_dts_from_pts(ic, stream_index, ic->internal->packet_buffer);
             }
         }
@@ -3742,6 +3755,9 @@ FF_ENABLE_DEPRECATION_WARNINGS
 
         /* if no packet was ever seen, update context now for has_codec_parameters */
         if (!st->internal->avctx_inited) {
+            if (st->codecpar->codec_type == AVMEDIA_TYPE_AUDIO &&
+                st->codecpar->format == AV_SAMPLE_FMT_NONE)
+                st->codecpar->format = st->internal->avctx->sample_fmt;
             ret = avcodec_parameters_to_context(st->internal->avctx, st->codecpar);
             if (ret < 0)
                 goto find_stream_info_err;
@@ -3789,8 +3805,6 @@ FF_DISABLE_DEPRECATION_WARNINGS
             av_codec_set_lowres(st->codec, av_codec_get_lowres(st->internal->avctx));
             st->codec->width = st->internal->avctx->width;
             st->codec->height = st->internal->avctx->height;
-            st->codec->coded_width = st->internal->avctx->coded_width;
-            st->codec->coded_height = st->internal->avctx->coded_height;
         }
 
         if (st->codec->codec_tag != MKTAG('t','m','c','d'))
@@ -3807,6 +3821,8 @@ FF_DISABLE_DEPRECATION_WARNINGS
         }
 
         // Fields unavailable in AVCodecParameters
+        st->codec->coded_width = st->internal->avctx->coded_width;
+        st->codec->coded_height = st->internal->avctx->coded_height;
         st->codec->properties = st->internal->avctx->properties;
 FF_ENABLE_DEPRECATION_WARNINGS
 #endif
@@ -3946,6 +3962,10 @@ static void free_stream(AVStream **pst)
 
     if (st->internal) {
         avcodec_free_context(&st->internal->avctx);
+        for (i = 0; i < st->internal->nb_bsfcs; i++) {
+            av_bsf_free(&st->internal->bsfcs[i]);
+            av_freep(&st->internal->bsfcs);
+        }
     }
     av_freep(&st->internal);
 
@@ -4970,26 +4990,63 @@ uint8_t *av_stream_new_side_data(AVStream *st, enum AVPacketSideDataType type,
 
 int ff_stream_add_bitstream_filter(AVStream *st, const char *name, const char *args)
 {
-    AVBitStreamFilterContext *bsfc = NULL;
-    AVBitStreamFilterContext **dest = &st->internal->bsfc;
-    while (*dest && (*dest)->next)
-        dest = &(*dest)->next;
+    int ret;
+    const AVBitStreamFilter *bsf;
+    AVBSFContext *bsfc;
+    AVCodecParameters *in_par;
 
-    if (!(bsfc = av_bitstream_filter_init(name))) {
+    if (!(bsf = av_bsf_get_by_name(name))) {
         av_log(NULL, AV_LOG_ERROR, "Unknown bitstream filter '%s'\n", name);
-        return AVERROR(EINVAL);
+        return AVERROR_BSF_NOT_FOUND;
     }
-    if (args && !(bsfc->args = av_strdup(args))) {
-        av_bitstream_filter_close(bsfc);
-        return AVERROR(ENOMEM);
+
+    if ((ret = av_bsf_alloc(bsf, &bsfc)) < 0)
+        return ret;
+
+    if (st->internal->nb_bsfcs) {
+        in_par = st->internal->bsfcs[st->internal->nb_bsfcs - 1]->par_out;
+        bsfc->time_base_in = st->internal->bsfcs[st->internal->nb_bsfcs - 1]->time_base_out;
+    } else {
+        in_par = st->codecpar;
+        bsfc->time_base_in = st->time_base;
     }
+
+    if ((ret = avcodec_parameters_copy(bsfc->par_in, in_par)) < 0) {
+        av_bsf_free(&bsfc);
+        return ret;
+    }
+
+    if (args && bsfc->filter->priv_class) {
+        const AVOption *opt = av_opt_next(bsfc->priv_data, NULL);
+        const char * shorthand[2] = {NULL};
+
+        if (opt)
+            shorthand[0] = opt->name;
+
+        if ((ret = av_opt_set_from_string(bsfc->priv_data, args, shorthand, "=", ":")) < 0) {
+            av_bsf_free(&bsfc);
+            return ret;
+        }
+    }
+
+    if ((ret = av_bsf_init(bsfc)) < 0) {
+        av_bsf_free(&bsfc);
+        return ret;
+    }
+
+    if ((ret = av_dynarray_add_nofree(&st->internal->bsfcs, &st->internal->nb_bsfcs, bsfc))) {
+        av_bsf_free(&bsfc);
+        return ret;
+    }
+
     av_log(NULL, AV_LOG_VERBOSE,
            "Automatically inserted bitstream filter '%s'; args='%s'\n",
            name, args ? args : "");
-    *dest = bsfc;
     return 1;
 }
 
+#if FF_API_OLD_BSF
+FF_DISABLE_DEPRECATION_WARNINGS
 int av_apply_bitstream_filters(AVCodecContext *codec, AVPacket *pkt,
                                AVBitStreamFilterContext *bsfc)
 {
@@ -5043,6 +5100,8 @@ int av_apply_bitstream_filters(AVCodecContext *codec, AVPacket *pkt,
     }
     return ret;
 }
+FF_ENABLE_DEPRECATION_WARNINGS
+#endif
 
 void ff_format_io_close(AVFormatContext *s, AVIOContext **pb)
 {
